@@ -1,0 +1,722 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  password          String   @db.Text
+  name              String
+  phone             String?
+  age               Int?
+  weight            Float?
+  height            Float?
+  gender            Gender?
+  healthConditions  Json?    // Changed from String[] to Json for MySQL compatibility
+  dietPreferences   Json?    // Changed from String[] to Json for MySQL compatibility
+  allergies         Json?    // Changed from String[] to Json for MySQL compatibility
+  goalType          GoalType?
+  targetCalories    Int?
+  targetProtein     Int?
+  targetCarbs       Int?
+  targetFats        Int?
+  emailVerified     Boolean  @default(false)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  orders            Order[]
+  subscriptions     Subscription[]
+  cartItems         CartItem[]
+  ratings           Rating[]
+  weightEntries     WeightEntry[]
+  conversations     Conversation[]
+  notifications     Notification[]
+  recommendations   Recommendation[]
+  userBehavior      UserBehavior?
+  billingProfiles   BillingProfile[]
+  invoices          Invoice[]
+  payments          Payment[]
+  paymentMethods    SavedPaymentMethod[]
+
+  @@map("users")
+}
+
+model Meal {
+  id              String     @id @default(cuid())
+  name            String
+  description     String     @db.Text
+  price           Float
+  calories        Int
+  protein         Float
+  carbs           Float
+  fats            Float
+  image           String
+  dietaryTags     Json?      // Changed from String[] to Json for MySQL compatibility
+  goals           Json?      // Changed from String[] to Json for MySQL compatibility
+  planType        PlanType?
+  mealTime        MealTime?
+  dietType        DietType?
+  ingredients     Json?      // Changed from String[] to Json for MySQL compatibility
+  allergens       Json?      // Changed from String[] to Json for MySQL compatibility
+  preparationTime Int?       // in minutes
+  availability    Boolean    @default(true)
+  isActive        Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relations
+  orderItems      OrderItem[]
+  cartItems       CartItem[]
+  ratings         Rating[]
+
+  @@map("meals")
+}
+
+model Order {
+  id                String      @id @default(cuid())
+  userId            String
+  subtotal          Float
+  tax               Float
+  deliveryFee       Float
+  total             Float
+  status            OrderStatus @default(PREPARING)
+  paymentMethod     PaymentMethod
+  paymentStatus     PaymentStatus @default(PENDING)
+  deliveryAddress   Json        // Store as JSON for flexibility
+  estimatedDelivery DateTime?
+  actualDelivery    DateTime?
+  deliveryPartnerId String?
+  scheduledFor      Json?       // For scheduled meals
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  user              User         @relation(fields: [userId], references: [id])
+  items             OrderItem[]
+  deliveryPartner   DeliveryPartner? @relation(fields: [deliveryPartnerId], references: [id])
+  payments          Payment[]
+  invoice           Invoice?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  orderId  String
+  mealId   String
+  quantity Int
+  price    Float
+  calories Int
+  protein  Float
+  carbs    Float
+  fats     Float
+
+  // Relations
+  order    Order  @relation(fields: [orderId], references: [id])
+  meal     Meal   @relation(fields: [mealId], references: [id])
+
+  @@map("order_items")
+}
+
+model CartItem {
+  id       String @id @default(cuid())
+  userId   String
+  mealId   String
+  quantity Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user     User   @relation(fields: [userId], references: [id])
+  meal     Meal   @relation(fields: [mealId], references: [id])
+
+  @@unique([userId, mealId])
+  @@map("cart_items")
+}
+
+model Subscription {
+  id           String            @id @default(cuid())
+  userId       String
+  planId       String
+  mealsPerDay  Int
+  daysPerWeek  Int
+  price        Float
+  startDate    DateTime
+  endDate      DateTime?
+  renewalDate  DateTime
+  status       SubscriptionStatus @default(ACTIVE)
+  autoRenew    Boolean           @default(true)
+  paymentMethod PaymentMethod
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  // Relations
+  user         User              @relation(fields: [userId], references: [id])
+  plan         SubscriptionPlan  @relation(fields: [planId], references: [id])
+  payments     Payment[]
+  billingCycles BillingCycle[]
+  invoices     Invoice[]
+
+  @@map("subscriptions")
+}
+
+model SubscriptionPlan {
+  id           String   @id @default(cuid())
+  name         String
+  mealsPerDay  Int
+  daysPerWeek  Int
+  price        Float
+  features     Json?    // Changed from String[] to Json for MySQL compatibility
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+model DeliveryPartner {
+  id              String   @id @default(cuid())
+  name            String
+  phone           String   @unique
+  email           String   @unique
+  vehicle         String
+  currentLocation Json?    // {lat, lng}
+  rating          Float?
+  totalDeliveries Int      @default(0)
+  status          DeliveryPartnerStatus @default(ACTIVE)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  orders          Order[]
+
+  @@map("delivery_partners")
+}
+
+model Rating {
+  id         String   @id @default(cuid())
+  userId     String
+  mealId     String
+  rating     Int      // 1-5
+  review     String?
+  helpful    Int      @default(0)
+  unhelpful  Int      @default(0)
+  verified   Boolean  @default(false) // If user actually purchased the meal
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  user       User     @relation(fields: [userId], references: [id])
+  meal       Meal     @relation(fields: [mealId], references: [id])
+
+  @@unique([userId, mealId])
+  @@map("ratings")
+}
+
+model WeightEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  weight    Float
+  date      DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("weight_entries")
+}
+
+model Conversation {
+  id         String           @id @default(cuid())
+  userId     String
+  type       ConversationType
+  assignedTo String?          // Admin/Nutritionist ID
+  status     ConversationStatus @default(OPEN)
+  createdAt  DateTime         @default(now())
+  closedAt   DateTime?
+
+  // Relations
+  user       User             @relation(fields: [userId], references: [id])
+  messages   ChatMessage[]
+
+  @@map("conversations")
+}
+
+model ChatMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String?      // null if from support/nutritionist
+  sender         MessageSender
+  message        String       @db.Text
+  attachments    Json?        // Changed from String[] to Json for MySQL compatibility
+  isRead         Boolean      @default(false)
+  timestamp      DateTime     @default(now())
+
+  // Relations
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+
+  @@map("chat_messages")
+}
+
+model Notification {
+  id        String            @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String            @db.Text
+  isRead    Boolean           @default(false)
+  channels  Json?             // Changed from NotificationChannel[] to Json for MySQL compatibility
+  expiresAt DateTime?
+  createdAt DateTime          @default(now())
+
+  // Relations
+  user      User              @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  orderUpdates    Boolean @default(true)
+  deliveryUpdates Boolean @default(true)
+  promotions      Boolean @default(true)
+  nutritionTips   Boolean @default(true)
+  emailFrequency  EmailFrequency @default(DAILY)
+  smsEnabled      Boolean @default(true)
+  pushEnabled     Boolean @default(true)
+
+  @@map("notification_preferences")
+}
+
+model Recommendation {
+  id          String   @id @default(cuid())
+  userId      String
+  meals       Json     // Array of {mealId, matchScore, reason, aiExplanation}
+  algorithm   String   // Version of recommendation algorithm used
+  generatedAt DateTime @default(now())
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("recommendations")
+}
+
+model UserBehavior {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  viewedMeals    Json?    // Changed from String[] to Json for MySQL compatibility
+  purchasedMeals Json?    // Changed from String[] to Json for MySQL compatibility
+  ratedMeals     Json?    // Changed from String[] to Json for MySQL compatibility
+  searchQueries  Json?    // Changed from String[] to Json for MySQL compatibility
+  timeSpent      Int      @default(0) // Total time in minutes
+  lastActive     DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@map("user_behavior")
+}
+
+model Coupon {
+  id            String      @id @default(cuid())
+  code          String      @unique
+  discountType  DiscountType
+  discountValue Float
+  minOrderValue Float?
+  maxUses       Int?
+  usedCount     Int         @default(0)
+  expiryDate    DateTime?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("coupons")
+}
+
+model Admin {
+  id          String      @id @default(cuid())
+  email       String      @unique
+  password    String      @db.Text
+  name        String
+  role        AdminRole   @default(ADMIN)
+  permissions Json?       // Changed from String[] to Json for MySQL compatibility
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  logs        AdminLog[]
+
+  @@map("admins")
+}
+
+model AdminLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  entityType String
+  entityId   String?
+  changes    Json?
+  timestamp  DateTime @default(now())
+
+  // Relations
+  admin      Admin    @relation(fields: [adminId], references: [id])
+
+  @@map("admin_logs")
+}
+
+// Billing and Payment Models
+
+model BillingProfile {
+  id              String   @id @default(cuid())
+  userId          String
+  companyName     String?
+  billingName     String
+  billingEmail    String
+  billingPhone    String?
+  billingAddress  Json     // {street, city, state, country, zipCode}
+  taxId           String?  // GST/VAT number
+  isDefault       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id])
+  invoices        Invoice[]
+
+  @@map("billing_profiles")
+}
+
+model SavedPaymentMethod {
+  id              String            @id @default(cuid())
+  userId          String
+  type            PaymentMethodType
+  provider        String            // stripe, razorpay, etc.
+  providerMethodId String           // External payment method ID
+  last4           String?           // Last 4 digits for cards
+  brand           String?           // visa, mastercard, etc.
+  expiryMonth     Int?
+  expiryYear      Int?
+  holderName      String?
+  isDefault       Boolean           @default(false)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  user            User              @relation(fields: [userId], references: [id])
+  payments        Payment[]
+
+  @@map("saved_payment_methods")
+}
+
+model Payment {
+  id                    String            @id @default(cuid())
+  userId                String
+  orderId               String?
+  subscriptionId        String?
+  invoiceId             String?
+  savedPaymentMethodId  String?
+  amount                Float
+  currency              String            @default("INR")
+  paymentMethod         PaymentMethod
+  paymentProvider       String            // stripe, razorpay, manual
+  providerTransactionId String?           // External transaction ID
+  providerResponse      Json?             // Full provider response
+  status                PaymentStatus     @default(PENDING)
+  failureReason         String?
+  refundAmount          Float?
+  refundReason          String?
+  refundedAt            DateTime?
+  metadata              Json?             // Additional payment data
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  // Relations
+  user                  User              @relation(fields: [userId], references: [id])
+  order                 Order?            @relation(fields: [orderId], references: [id])
+  subscription          Subscription?     @relation(fields: [subscriptionId], references: [id])
+  invoice               Invoice?          @relation(fields: [invoiceId], references: [id])
+  savedPaymentMethod    SavedPaymentMethod? @relation(fields: [savedPaymentMethodId], references: [id])
+  attempts              PaymentAttempt[]
+
+  @@map("payments")
+}
+
+model Invoice {
+  id                String        @id @default(cuid())
+  userId            String
+  billingProfileId  String?
+  invoiceNumber     String        @unique
+  type              InvoiceType
+  status            InvoiceStatus @default(DRAFT)
+  issueDate         DateTime      @default(now())
+  dueDate           DateTime?
+  paidDate          DateTime?
+  
+  // Amounts
+  subtotal          Float
+  taxAmount         Float
+  discountAmount    Float         @default(0)
+  totalAmount       Float
+  paidAmount        Float         @default(0)
+  
+  // Invoice Details
+  description       String?
+  notes             String?
+  terms             String?
+  
+  // Tax Information
+  taxRate           Float?
+  taxType           String?       // GST, VAT, etc.
+  
+  // Related entities
+  orderId           String?
+  subscriptionId    String?
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  user              User          @relation(fields: [userId], references: [id])
+  billingProfile    BillingProfile? @relation(fields: [billingProfileId], references: [id])
+  order             Order?        @relation(fields: [orderId], references: [id])
+  subscription      Subscription? @relation(fields: [subscriptionId], references: [id])
+  items             InvoiceItem[]
+  payments          Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+  taxRate     Float?
+  taxAmount   Float?
+
+  // Relations
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@map("invoice_items")
+}
+
+model BillingCycle {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  cycleNumber     Int
+  startDate       DateTime
+  endDate         DateTime
+  billingDate     DateTime
+  amount          Float
+  status          BillingCycleStatus @default(PENDING)
+  invoiceId       String?
+  paymentId       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@unique([subscriptionId, cycleNumber])
+  @@map("billing_cycles")
+}
+
+model PaymentAttempt {
+  id              String            @id @default(cuid())
+  paymentId       String
+  attemptNumber   Int
+  status          PaymentStatus
+  providerResponse Json?
+  failureReason   String?
+  attemptedAt     DateTime          @default(now())
+
+  // Relations
+  payment         Payment           @relation(fields: [paymentId], references: [id])
+
+  @@map("payment_attempts")
+}
+
+model TaxConfiguration {
+  id          String   @id @default(cuid())
+  country     String
+  state       String?
+  taxType     String   // GST, VAT, Sales Tax
+  taxRate     Float
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([country, state, taxType])
+  @@map("tax_configurations")
+}
+
+// Enums
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum GoalType {
+  WEIGHT_LOSS
+  MUSCLE_GAIN
+  MAINTENANCE
+  DIABETIC_CONTROL
+}
+
+enum PlanType {
+  WEIGHT_LOSS
+  WEIGHT_GAIN
+  MAINTENANCE
+}
+
+enum MealTime {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+enum DietType {
+  VEG
+  NON_VEG
+  VEGAN
+}
+
+enum OrderStatus {
+  PREPARING
+  OUT_FOR_DELIVERY
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CARD
+  UPI
+  WALLET
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  EXPIRED
+}
+
+enum DeliveryPartnerStatus {
+  ACTIVE
+  INACTIVE
+  BUSY
+}
+
+enum ConversationType {
+  SUPPORT
+  NUTRITIONIST
+}
+
+enum ConversationStatus {
+  OPEN
+  CLOSED
+}
+
+enum MessageSender {
+  USER
+  SUPPORT
+  NUTRITIONIST
+}
+
+enum NotificationType {
+  ORDER_UPDATE
+  DELIVERY_UPDATE
+  REMINDER
+  PROMOTION
+  NUTRITION_TIP
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum EmailFrequency {
+  IMMEDIATE
+  DAILY
+  WEEKLY
+  NEVER
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+}
+
+enum PaymentMethodType {
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  NET_BANKING
+  WALLET
+  BANK_TRANSFER
+}
+
+enum InvoiceType {
+  ORDER
+  SUBSCRIPTION
+  REFUND
+  ADJUSTMENT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+enum BillingCycleStatus {
+  PENDING
+  BILLED
+  PAID
+  FAILED
+  CANCELLED
+}
