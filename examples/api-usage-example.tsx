@@ -356,6 +356,10 @@ export function CheckoutExample() {
 }
 
 // Example 5: Using with React Query (Optional)
+// Note: To use React Query, install it first: npm install @tanstack/react-query
+// Then uncomment the code below
+
+/*
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 export function MealsWithReactQuery() {
@@ -400,3 +404,4 @@ export function MealsWithReactQuery() {
     </div>
   )
 }
+*/
